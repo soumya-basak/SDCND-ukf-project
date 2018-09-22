@@ -1,5 +1,7 @@
 #include <uWS/uWS.h>
 #include <iostream>
+#include <fstream>
+#include <iomanip>
 #include "json.hpp"
 #include <math.h>
 #include "ukf.h"
@@ -9,6 +11,9 @@ using namespace std;
 
 // for convenience
 using json = nlohmann::json;
+
+// This is created as a global variable for saving NIS values after each time step
+ofstream output_nis;
 
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
@@ -26,7 +31,7 @@ std::string hasData(std::string s) {
   return "";
 }
 
-int main()
+int main(int iArgC, char** iArgV)
 {
   uWS::Hub h;
 
@@ -37,6 +42,20 @@ int main()
   Tools tools;
   vector<VectorXd> estimations;
   vector<VectorXd> ground_truth;
+
+  // Open a stream to file in which NIS values for current time stamp will be stored.
+  if (iArgC > 1) {
+    string is_save_nis = iArgV[1];
+    if (is_save_nis.compare("save-nis") == 0) {
+      output_nis.open(iArgV[2], ofstream::out);
+      if (output_nis.is_open()) {
+        output_nis<<"Sensor(0-Laser,1-Radar)"<<setw(30);
+        output_nis<<"Timestamp"<<setw(20);
+        output_nis<<"NIS"<<setw(20)<<endl;
+      }
+    }
+  }
+
 
   h.onMessage([&ukf,&tools,&estimations,&ground_truth](uWS::WebSocket<uWS::SERVER> ws, char *data, size_t length, uWS::OpCode opCode) {
     // "42" at the start of the message means there's a websocket message event.
@@ -171,6 +190,10 @@ int main()
 
   h.onDisconnection([&h](uWS::WebSocket<uWS::SERVER> ws, int code, char *message, size_t length) {
     ws.close();
+    // Close the file handle if open
+    if (output_nis.is_open()) {
+      output_nis.close();
+    }
     std::cout << "Disconnected" << std::endl;
   });
 
